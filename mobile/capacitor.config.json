@@ -1,0 +1,7 @@
+{
+  "appId": "com.ghostgrid.game",
+  "appName": "GHOST GRID",
+  "webDir": "www",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": { "allowMixedContent": true }
+}

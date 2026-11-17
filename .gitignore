@@ -1,0 +1,10 @@
+node_modules/
+dist/
+server/public/
+server/data/
+.env
+*.log
+desktop/app/
+desktop/release/
+mobile/www/
+mobile/android/

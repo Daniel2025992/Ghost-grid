@@ -1,0 +1,16 @@
+{
+  "name": "ghost-grid-desktop",
+  "version": "1.0.0",
+  "description": "GHOST//GRID desktop",
+  "author": "GHOST//GRID",
+  "main": "main.js",
+  "scripts": { "start": "electron .", "dist": "electron-builder --win portable nsis --publish never" },
+  "devDependencies": { "electron": "^33.2.0", "electron-builder": "^25.1.8" },
+  "build": {
+    "appId": "com.ghostgrid.game",
+    "productName": "GHOST-GRID",
+    "files": ["main.js", "app/**"],
+    "directories": { "output": "release" },
+    "win": { "target": ["portable", "nsis"] }
+  }
+}

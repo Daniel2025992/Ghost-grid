@@ -1,0 +1,12 @@
+{
+  "name": "ghost-grid",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GHOST//GRID - 3D fake-hacking puzzle game with online rooms",
+  "scripts": {
+    "install:all": "npm --prefix client install && npm --prefix server install",
+    "build": "npm --prefix client run build && node -e \"require('fs').mkdirSync('server/public',{recursive:true});require('fs').copyFileSync('dist/index.html','server/public/index.html')\"",
+    "start": "node server/index.js",
+    "test": "npm --prefix server test"
+  }
+}
