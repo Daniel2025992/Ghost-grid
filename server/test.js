@@ -36,7 +36,11 @@ try {
   r = await api('/api/register', 'POST', { email: 'bad', password: 'longenough1' }); t('bad email rejected', r.s === 400);
   r = await api('/api/register', 'POST', { email: 'a@x.com', password: 'password1', name: 'Alice' }); t('register', r.s === 200 && r.j.user.role === 'player');
   const alice = r.j.token, aliceId = r.j.user.id;
-  r = await api('/api/register', 'POST', { email: 'A@x.com', password: 'password1' }); t('duplicate email (case-insens.)', r.s === 409);
+  r = await api('/api/register', 'POST', { email: 'A@x.com', password: 'password1', name: 'Other' }); t('duplicate email (case-insens.)', r.s === 409);
+  r = await api('/api/register', 'POST', { email: 'z@x.com', password: 'password1' }); t('username required', r.s === 400);
+  r = await api('/api/register', 'POST', { email: 'z@x.com', password: 'password1', name: 'ab' }); t('username too short', r.s === 400);
+  r = await api('/api/register', 'POST', { email: 'z@x.com', password: 'password1', name: 'alice' }); t('username unique (case-insens.)', r.s === 409);
+  r = await api('/api/login', 'POST', { email: 'alice', password: 'password1' }); t('login with username', r.s === 200);
   r = await api('/api/register', 'POST', { email: 'b@x.com', password: 'password2', name: 'Bob' }); const bob = r.j.token, bobId = r.j.user.id;
   r = await api('/api/me', 'GET', null, alice); t('me', r.j.user.email === 'a@x.com');
   r = await api('/api/progress', 'PUT', { progress: { xp: 5 } }, alice); r = await api('/api/me', 'GET', null, alice); t('progress saved', r.j.progress.xp === 5);

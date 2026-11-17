@@ -19,8 +19,8 @@ export function initOnline(ctx) {
   const auth = el(`<div class="card glass" style="text-align:right">
     <h2 style="text-align:center;font-family:Consolas,monospace;letter-spacing:4px;direction:ltr"><b style="color:var(--c)">GHOST</b><i style="color:var(--m);font-style:normal">//</i><b style="color:var(--c)">GRID</b></h2>
     <div class="tabs"><button id="aTabIn" class="on">התחברות</button><button id="aTabUp">הרשמה</button></div>
-    <input class="fld" id="aName" placeholder="שם שחקן" hidden style="letter-spacing:1px;font-size:15px;margin-top:8px">
-    <input class="fld" id="aEmail" type="email" placeholder="אימייל" autocomplete="username" style="letter-spacing:1px;font-size:15px;margin-top:8px;text-align:left">
+    <input class="fld" id="aName" placeholder="שם משתמש (3-20 תווים)" hidden maxlength="20" style="letter-spacing:1px;font-size:15px;margin-top:8px">
+    <input class="fld" id="aEmail" type="text" placeholder="אימייל" autocapitalize="off" autocomplete="username" style="letter-spacing:1px;font-size:15px;margin-top:8px;text-align:left">
     <input class="fld" id="aPass" type="password" placeholder="סיסמה (8+ תווים)" autocomplete="current-password" style="letter-spacing:1px;font-size:15px;margin-top:8px;text-align:left">
     <button class="big" id="aGo" style="margin-top:12px">התחבר</button>
     <div id="gBtn" style="margin-top:10px;display:flex;justify-content:center"></div>
@@ -32,7 +32,7 @@ export function initOnline(ctx) {
   </div>`, 'auth', 'overlay');
   auth.hidden = true; auth.style.zIndex = 50;
   let mode = 'in';
-  const setTab = m => { mode = m; $('aTabIn').classList.toggle('on', m === 'in'); $('aTabUp').classList.toggle('on', m === 'up'); $('aName').hidden = m === 'in'; $('aGo').textContent = m === 'in' ? 'התחבר' : 'צור חשבון'; $('aPass').autocomplete = m === 'in' ? 'current-password' : 'new-password'; };
+  const setTab = m => { mode = m; $('aTabIn').classList.toggle('on', m === 'in'); $('aTabUp').classList.toggle('on', m === 'up'); $('aName').hidden = m === 'in'; $('aEmail').placeholder = m === 'in' ? 'אימייל או שם משתמש' : 'אימייל'; $('aGo').textContent = m === 'in' ? 'התחבר' : 'צור חשבון'; $('aPass').autocomplete = m === 'in' ? 'current-password' : 'new-password'; };
   $('aTabIn').onclick = () => setTab('in'); $('aTabUp').onclick = () => setTab('up');
   const amsg = (t, ok) => { $('aMsg').textContent = t; $('aMsg').style.color = ok ? 'var(--g)' : 'var(--r)'; };
 
@@ -55,6 +55,7 @@ export function initOnline(ctx) {
     amsg('', true); $('aGo').disabled = true;
     try {
       if (!(await loadConfig())) throw new Error('אין חיבור לשרת. בדוק את הכתובת ב"כתובת שרת"');
+      if (mode === 'up' && $('aName').value.trim().length < 3) throw new Error('חובה לבחור שם משתמש (3 תווים לפחות)');
       const j = await api(mode === 'in' ? '/api/login' : '/api/register', 'POST', {email: $('aEmail').value, password: $('aPass').value, name: $('aName').value});
       await finishLogin(j);
     } catch (e) { amsg(e.message); }

@@ -27,6 +27,12 @@ const checkPw = (pw, u) => { if (!u.hash) return false; const h = crypto.scryptS
 const uid = () => crypto.randomBytes(8).toString('hex');
 const normEmail = e => String(e || '').trim().toLowerCase();
 const validEmail = e => /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(e);
+const nameTaken = (n, exceptId) => Object.values(db.users).some(u => u.id !== exceptId && u.name.toLowerCase() === n.toLowerCase());
+const validName = n => /^[\p{L}\p{N}_.\- ]{3,20}$/u.test(n);
+function uniqueName(base) {
+  let b = String(base || 'player').replace(/[^\p{L}\p{N}_.\-]/gu, '').slice(0, 16) || 'player'; if (b.length < 3) b += '123';
+  let n = b, i = 1; while (nameTaken(n)) n = b.slice(0, 16) + (++i); return n;
+}
 const publicUser = u => ({ id: u.id, email: u.email, name: u.name, role: u.role, banned: !!u.banned, created: u.created, google: !!u.google });
 
 // ---------- bootstrap owner ----------
@@ -36,7 +42,7 @@ function ensureOwner() {
   if (!email || !pw) return;
   let u = Object.values(db.users).find(x => x.email === email);
   if (!u) {
-    u = { id: uid(), email, name: 'Owner', role: 'owner', created: Date.now(), ...hashPw(pw), progress: null };
+    u = { id: uid(), email, name: uniqueName('Owner'), role: 'owner', created: Date.now(), ...hashPw(pw), progress: null };
     db.users[u.id] = u;
   } else {
     u.role = 'owner'; Object.assign(u, hashPw(pw));
@@ -93,9 +99,11 @@ app.get('/api/config', (req, res) => res.json({
 app.post('/api/register', (req, res) => {
   if (limited('reg' + ip(req), 10, 3600000)) return res.status(429).json({ error: 'too many attempts' });
   if (!db.settings.allowSignup) return res.status(403).json({ error: 'signup disabled' });
-  const email = normEmail(req.body.email), pw = String(req.body.password || ''), name = String(req.body.name || '').trim().slice(0, 20) || email.split('@')[0];
+  const email = normEmail(req.body.email), pw = String(req.body.password || ''), name = String(req.body.name || '').trim();
   if (!validEmail(email)) return res.status(400).json({ error: 'invalid email' });
+  if (!validName(name)) return res.status(400).json({ error: 'username must be 3-20 letters/numbers' });
   if (pw.length < 8 || pw.length > 200) return res.status(400).json({ error: 'password must be 8+ chars' });
+  if (nameTaken(name)) return res.status(409).json({ error: 'username already taken' });
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({ error: 'email already registered' });
   const u = { id: uid(), email, name, role: 'player', created: Date.now(), ...hashPw(pw), progress: null };
   db.users[u.id] = u; save();
@@ -104,8 +112,8 @@ app.post('/api/register', (req, res) => {
 
 app.post('/api/login', (req, res) => {
   if (limited('login' + ip(req), 20, 600000)) return res.status(429).json({ error: 'too many attempts' });
-  const email = normEmail(req.body.email), pw = String(req.body.password || '');
-  const u = Object.values(db.users).find(x => x.email === email);
+  const idf = String(req.body.email || '').trim().toLowerCase(), pw = String(req.body.password || '');
+  const u = Object.values(db.users).find(x => x.email === idf || x.name.toLowerCase() === idf);
   if (!u || !checkPw(pw, u)) return res.status(401).json({ error: 'wrong email or password' });
   if (u.banned) return res.status(403).json({ error: 'account banned' });
   res.json({ token: newSession(u.id), user: publicUser(u) });
@@ -122,7 +130,7 @@ app.post('/api/google', async (req, res) => {
     let u = Object.values(db.users).find(x => x.email === email);
     if (!u) {
       if (!db.settings.allowSignup) return res.status(403).json({ error: 'signup disabled' });
-      u = { id: uid(), email, name: (g.name || email.split('@')[0]).slice(0, 20), role: 'player', created: Date.now(), google: true, progress: null };
+      u = { id: uid(), email, name: uniqueName(g.name || email.split('@')[0]), role: 'player', created: Date.now(), google: true, progress: null };
       db.users[u.id] = u;
     } else u.google = true;
     if (u.banned) return res.status(403).json({ error: 'account banned' });
@@ -137,7 +145,7 @@ app.put('/api/progress', auth, (req, res) => {
   req.user.progress = p; save(); res.json({ ok: true });
 });
 app.put('/api/me', auth, (req, res) => {
-  if (req.body.name) req.user.name = String(req.body.name).trim().slice(0, 20) || req.user.name;
+  if (req.body.name) { const n = String(req.body.name).trim(); if (!validName(n)) return res.status(400).json({ error: 'username must be 3-20 letters/numbers' }); if (nameTaken(n, req.user.id)) return res.status(409).json({ error: 'username already taken' }); req.user.name = n; }
   if (req.body.password) {
     if (String(req.body.password).length < 8) return res.status(400).json({ error: 'password must be 8+ chars' });
     Object.assign(req.user, hashPw(String(req.body.password)));
@@ -162,7 +170,7 @@ app.post('/api/admin/add', auth, adminOnly, (req, res) => {
   if (!t) {
     tempPassword = String(req.body.password || crypto.randomBytes(6).toString('base64url'));
     if (tempPassword.length < 8) return res.status(400).json({ error: 'password must be 8+ chars' });
-    t = { id: uid(), email, name: email.split('@')[0], role: 'admin', created: Date.now(), ...hashPw(tempPassword), progress: null };
+    t = { id: uid(), email, name: uniqueName(email.split('@')[0]), role: 'admin', created: Date.now(), ...hashPw(tempPassword), progress: null };
     db.users[t.id] = t;
   } else if (t.role !== 'owner') t.role = 'admin';
   save(); res.json({ user: publicUser(t), tempPassword });
