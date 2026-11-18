@@ -1,9 +1,14 @@
 // Accounts, rooms (multiplayer) and admin panel. Everything works offline as a guest too.
+import {createP2P} from './p2p.js';
+
 export function initOnline(ctx) {
   const {S, world, hooks, WORLDS, SKINS, skinById, toast, glog, esc, $} = ctx;
   const O = {base: '', token: '', user: null, config: null, ws: null, room: null, you: null, hostId: null, peers: new Map(), connected: false};
   const ls = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} }};
   const el = (html, id, cls) => { const d = document.createElement('div'); if (id) d.id = id; if (cls) d.className = cls; d.innerHTML = html; document.body.appendChild(d); return d; };
+  const guestId = () => { let g = null; try { g = JSON.parse(ls.get('gg_guest') || 'null'); } catch (e) {} if (!g || !g.id) { g = {id: Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join(''), name: 'Player' + Math.floor(100 + Math.random() * 900)}; ls.set('gg_guest', JSON.stringify(g)); } return g; };
+  O.guest = guestId();
+  const self = () => O.user ? {id: O.user.id, name: O.user.name} : O.guest;
   const isAdmin = () => !!O.user && (O.user.role === 'admin' || O.user.role === 'owner');
 
   /* ---------- http ---------- */
@@ -25,7 +30,9 @@ export function initOnline(ctx) {
     <button class="big" id="aGo" style="margin-top:12px">התחבר</button>
     <div id="gBtn" style="margin-top:10px;display:flex;justify-content:center"></div>
     <div id="aMsg" class="note" style="min-height:18px;color:var(--r)"></div>
-    <button class="big sec" id="aGuest">🎮 שחק כאורח (בלי שרת, בלי חברים)</button>
+    <div class="step" style="margin-top:14px">או שחק בלי חשבון ובלי שרת</div>
+    <input class="fld" id="aGuestName" maxlength="20" placeholder="השם שלך" style="letter-spacing:0;font-size:15px;margin-top:6px;text-align:right">
+    <button class="big" id="aGuest" style="background:linear-gradient(90deg,var(--m),var(--c))">🎮 שחק (לבד או עם חברים בקוד חדר)</button>
     <details style="margin-top:10px"><summary class="note" style="cursor:pointer">⚙ כתובת שרת</summary>
       <input class="fld" id="aBase" placeholder="https://your-server.example" style="letter-spacing:0;font-size:14px;margin-top:8px;text-align:left">
       <div class="note">באתר שמוגש מהשרת עצמו זה מתמלא לבד. באפליקציית APK/EXE הדבק כאן את כתובת השרת שלך.</div></details>
@@ -62,7 +69,8 @@ export function initOnline(ctx) {
     $('aGo').disabled = false;
   };
   $('aPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('aGo').click(); });
-  $('aGuest').onclick = () => { O.user = null; O.token = ''; afterAuth(); };
+  $('aGuestName').value = O.guest.name;
+  $('aGuest').onclick = () => { O.user = null; O.token = ''; const n = $('aGuestName').value.trim().slice(0, 20); if (n.length >= 2) { O.guest.name = n; ls.set('gg_guest', JSON.stringify(O.guest)); } afterAuth(); };
 
   function setupGoogle() {
     const id = O.config && O.config.googleClientId; if (!id || $('gBtn').dataset.ok) return;
@@ -96,9 +104,12 @@ export function initOnline(ctx) {
       ? `<div class="chip" style="justify-content:center;margin:10px auto;width:max-content">👤 <b>${esc(u.name)}</b> · ${u.role === 'owner' ? '👑 בעלים' : u.role === 'admin' ? '🛡 מנהל' : 'שחקן'} <button id="mLogout" class="lnk" style="padding:3px 9px">יציאה</button></div>
          <button class="big" id="mMulti" style="margin-bottom:8px;background:linear-gradient(90deg,var(--m),var(--c))">👥 שחק עם חברים (קוד חדר)</button>
          ${isAdmin() ? '<button class="big sec" id="mAdmin" style="margin-top:0;margin-bottom:8px">⚙ פאנל ניהול</button>' : ''}`
-      : `<div class="note" style="text-align:center">מצב אורח: אפשר לשחק סולו. כדי לשחק עם חברים צריך להתחבר.</div><button class="big sec" id="mLogin" style="margin:8px 0">🔑 התחברות / הרשמה</button>`;
-    bRoom.hidden = !u; bAdmin.hidden = !isAdmin();
+      : `<div class="chip" style="justify-content:center;margin:10px auto;width:max-content">👤 <b>${esc(O.guest.name)}</b> <button id="mRename" class="lnk" style="padding:3px 9px">שנה שם</button></div>
+         <button class="big" id="mMulti" style="margin-bottom:8px;background:linear-gradient(90deg,var(--m),var(--c))">👥 שחק עם חברים (קוד חדר, בלי שרת)</button>
+         <button class="big sec" id="mLogin" style="margin:0 0 8px">🔑 יש לך שרת? התחברות / הרשמה</button>`;
+    bRoom.hidden = false; bAdmin.hidden = !isAdmin();
     if ($('mLogout')) $('mLogout').onclick = logout; if ($('mMulti')) $('mMulti').onclick = openMulti; if ($('mAdmin')) $('mAdmin').onclick = openAdmin; if ($('mLogin')) $('mLogin').onclick = showAuth;
+    if ($('mRename')) $('mRename').onclick = () => { const n = (prompt('השם שלך:', O.guest.name) || '').trim().slice(0, 20); if (n.length >= 2) { O.guest.name = n; ls.set('gg_guest', JSON.stringify(O.guest)); afterAuth(); } };
     $('bStart').textContent = '▶ משחק סולו · מפת עולמות';
     $('bAi').textContent = isAdmin() && O.config && O.config.aiForAdmins ? '✨ AI (שרת)' : '✨ AI';
   }
@@ -132,7 +143,7 @@ export function initOnline(ctx) {
       ws.onclose = () => { O.connected = false; if (O.room) { toast('החיבור לשרת נותק', 'bad'); leaveRoom(true); } };
     });
   }
-  const send = o => { if (O.ws && O.ws.readyState === 1) O.ws.send(JSON.stringify(o)); };
+  const send = o => { if (O.p2p) O.p2p.send(o); else if (O.ws && O.ws.readyState === 1) O.ws.send(JSON.stringify(o)); };
 
   function addChat(name, text, sys) {
     const l = $('chatLog'), d = document.createElement('div');
@@ -153,12 +164,12 @@ export function initOnline(ctx) {
   function toggleRoomPanel() { openMulti(); }
   function leaveRoom(silent) {
     if (O.room && !silent) send({t: 'leave'});
+    if (O.p2p) { O.p2p.close(); O.p2p = null; }
     O.room = null; hooks.inRoom = false; O.peers.clear(); world.clearPeers(); renderRoomBar(); hooks.onRoomSize && hooks.onRoomSize();
     clearInterval(O.tick); if (O.ws && silent) { try { O.ws.close(); } catch (e) {} O.ws = null; }
   }
   function worldOptions() { return WORLDS.map((w, i) => `<option value="${i}">${esc(w.name)}</option>`).join(''); }
   function openMulti() {
-    if (!O.user) { showAuth(); return; }
     mp.hidden = false; $('welcome').hidden = true;
     if (O.room) {
       mp.innerHTML = `<div class="card glass" style="text-align:right"><h2>👥 חדר ${esc(O.room.code)}</h2>
@@ -170,6 +181,7 @@ export function initOnline(ctx) {
       $('mpClose').onclick = () => { mp.hidden = true; };
       return;
     }
+    if (!O.user) return openMultiP2P();
     mp.innerHTML = `<div class="card glass" style="text-align:right"><h2>👥 משחק עם חברים</h2>
       <div class="step">צור חדר</div>
       <input class="fld" id="mpName" placeholder="שם החדר" maxlength="30" style="letter-spacing:0;font-size:14px;text-align:right">
@@ -198,6 +210,30 @@ export function initOnline(ctx) {
     };
     O.onErr = t => msg(t);
     refresh();
+  }
+
+  function openMultiP2P() {
+    mp.innerHTML = `<div class="card glass" style="text-align:right"><h2>👥 משחק עם חברים</h2>
+      <div class="note" style="margin-top:0">בלי שרת ובלי חשבון: חדר פרטי עם קוד, והחברים מתחברים ישירות אליך. החדר פעיל כל עוד אתה (המארח) במשחק.</div>
+      <div class="step">צור חדר</div>
+      <input class="fld" id="mpName" placeholder="שם החדר" maxlength="30" style="letter-spacing:0;font-size:14px;text-align:right">
+      <div class="row"><select class="fld" id="mpWorld" style="letter-spacing:0;font-size:14px;text-align:right">${worldOptions()}</select></div>
+      <button class="big" id="mpCreate" style="margin-top:10px">➕ צור חדר</button>
+      <div class="step">הצטרף בקוד</div>
+      <div class="row"><input class="fld" id="mpCode" maxlength="5" placeholder="CODE" style="text-transform:uppercase;text-align:center"><button id="mpJoin" style="background:var(--c);color:#02101a;font-weight:bold">הצטרף</button></div>
+      <div id="mpMsg" class="note" style="color:var(--r)"></div>
+      <button class="big sec" id="mpClose">חזרה</button></div>`;
+    const msg = t => { $('mpMsg').textContent = t; };
+    $('mpClose').onclick = () => { mp.hidden = true; if (!S.started) $('welcome').hidden = false; };
+    O.onErr = msg;
+    const run = async fn => {
+      if (O.p2p) { O.p2p.close(); O.p2p = null; }
+      msg('מתחבר…'); $('mpCreate').disabled = $('mpJoin').disabled = true;
+      try { O.p2p = createP2P(self(), onMsg); await fn(O.p2p); msg(''); } catch (e) { msg(e.message); if (O.p2p) { O.p2p.close(); O.p2p = null; } }
+      const a = $('mpCreate'), b = $('mpJoin'); if (a) a.disabled = false; if (b) b.disabled = false;
+    };
+    $('mpCreate').onclick = () => run(p => p.host({name: $('mpName').value, world: +$('mpWorld').value}));
+    $('mpJoin').onclick = () => run(p => p.join($('mpCode').value, S.skin));
   }
 
   function onMsg(m) {

@@ -212,6 +212,22 @@ body.inmap #chal,body.inmap #top,body.inmap #missions,body.inmap #log,body.inmap
  #skinPanel{left:0;right:0;top:auto;bottom:0;width:auto;max-height:46vh;border-radius:14px 14px 0 0}
  #prompt{bottom:178px}
 }
+
+@media(max-width:560px){
+ #top{padding:4px 6px;gap:4px;border-radius:0 0 12px 12px}
+ .logo{display:none}
+ #wchip{font-size:11px;padding:3px 6px;max-width:46vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+ .chip{padding:2px 6px;font-size:11px;gap:4px}.xp{width:30px;height:5px}.hb{width:40px;height:5px}
+ .btns{gap:4px;flex-wrap:wrap}
+ .ib{padding:4px 6px;font-size:11px;border-radius:8px}
+ #heatChip>span{font-size:10px}
+ #roomBar{top:74px;font-size:11px;max-width:96vw}
+ #chat{bottom:120px;width:60vw;font-size:12px}
+ #chal{top:78px;width:94vw;padding:6px 8px}#chal .ct{font-size:12px;margin-bottom:3px}#chal .cr{font-size:11px;gap:6px}
+ #missions{max-height:40vh}
+ #joy{transform:scale(.8);transform-origin:bottom left}
+ .card,#authCard{max-height:94vh;overflow-y:auto}
+}
 </style>
 </head>
 <body>

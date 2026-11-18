@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": { "build": "node build.mjs ../dist/index.html" },
-  "dependencies": { "three": "^0.187.0" },
+  "dependencies": { "peerjs": "^1.5.4", "three": "^0.187.0" },
   "devDependencies": { "esbuild": "^0.28.2" }
 }
