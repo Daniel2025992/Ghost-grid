@@ -1,6 +1,6 @@
 import {build} from 'esbuild';
 import fs from 'node:fs';
-const out = await build({entryPoints: ['game.js'], bundle: true, minify: true, format: 'iife', write: false, target: 'es2020', legalComments: 'none'});
+const out = await build({entryPoints: ['game.js'], bundle: true, minify: true, format: 'iife', write: false, target: 'es2020', legalComments: 'none', define: {__DEFAULT_SERVER__: JSON.stringify(process.env.GG_SERVER || '')}});
 const code = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const html = fs.readFileSync('template.html', 'utf8').replace('/*BUNDLE*/', () => code);
 const dest = process.argv[2] || '../dist/index.html';

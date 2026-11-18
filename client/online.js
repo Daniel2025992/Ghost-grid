@@ -322,7 +322,7 @@ export function initOnline(ctx) {
     const demo = /demo|walk|near|skin|hack|api|brief|map/.test(location.hash);
     if (!demo) showAuth();
     const origin = /^https?:/.test(location.protocol) ? location.origin : '';
-    O.base = (saved && saved.base) || origin; $('aBase').value = O.base;
+    O.base = (saved && saved.base) || origin || (typeof __DEFAULT_SERVER__ !== 'undefined' ? __DEFAULT_SERVER__ : ''); $('aBase').value = O.base;
     await loadConfig();
     if (!O.config && origin && O.base !== origin) { O.base = origin; await loadConfig(); }
     if (saved && saved.token && O.config) {
