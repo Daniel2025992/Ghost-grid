@@ -717,6 +717,41 @@ const isUnlocked = i => i === 0 || S.isAdmin || !!hooks.inRoom || !!(S.worlds[i 
 function mapData() {
   return WORLDS.map((w, i) => ({...w, locked: !isUnlocked(i), lockText: 'השלם עולם ' + i, done: !!(S.worlds[i] && S.worlds[i].done), stars: S.worlds[i] && S.worlds[i].stars, progress: w.nodes + ' צמתים'}));
 }
+
+/* ---------- intro briefing (Hebrew text + spoken voice) ---------- */
+const STORIES = [
+  'שלום, סוכן. בלב רובע הניאון מערכת הרשת התחילה להתפרק. האורות מהבהבים, הקודים מתבלבלים ורחפן סיור אחד כבר מחפש אותך. אנחנו צריכים שתגיע לצמתים ותתקן אותם, אחד אחד, לפני שהעיר תיכבה לגמרי. עקוב אחרי המשימות ופתור כל אחת בתוך העולם.',
+  'יש בעיה במפעל הארגמן. המכונות יצאו משליטה, גחלים עפות באוויר ושני רחפנים שומרים על המקום. אם לא נחזיר את השליטה, כל המפעל ייפול. הגע לצמתים ותקן אותם מהר, כי הזמן כאן קצר יותר.',
+  'ביצת הרעל התמלאה בערפל ירוק, והמערכת שם נדבקה בווירוס. שלושה רחפנים מסיירים בין הבצורות הזוהרות. היזהר מהקרניים, הגע לכל צומת ונקה אותו כדי שהביצה תחזור לחיים.',
+  'מערך הקרח קפא. כל הנתונים נעולים בתוך גבישי קרח, והרחפנים כאן מהירים במיוחד. החידות קשות יותר, אבל אם תפתור אותן הקרח יימס והמערכת תחזור לעבוד.',
+  'מצודת הריק היא המקום המסוכן ביותר עד עכשיו. גשם סגול, אובליסקים אפלים וארבעה רחפנים. כאן כבר צריך מיומנות. תקן את הצמתים לפני שהריק יבלע את הרשת.',
+  'הגעת לליבת השמש, המקום האחרון. אם הליבה תקרוס, כל העולמות יפלו איתה. חמישה רחפנים שומרים עליה, ובסוף מחכה בוס עם שלוש חידות ברצף. תקן הכול והצל את הרשת.'
+];
+let introEl = null;
+function stopSpeech() { try { speechSynthesis.cancel(); } catch (e) {} }
+function speakHe(text, btn) {
+  if (!('speechSynthesis' in window)) { toast('המכשיר לא תומך בהשמעת קול', 'bad'); return; }
+  stopSpeech();
+  const u = new SpeechSynthesisUtterance(text); u.lang = 'he-IL'; u.rate = 0.95;
+  const v = speechSynthesis.getVoices().find(v => /^he/i.test(v.lang) || /hebrew|עברית/i.test(v.name));
+  if (v) u.voice = v; else if (speechSynthesis.getVoices().length) toast('לא נמצא קול בעברית במכשיר. אפשר להוסיף אותו בהגדרות הדיבור של הטלפון', 'bad');
+  u.onstart = () => { if (btn) btn.textContent = '⏹ עצור'; };
+  u.onend = u.onerror = () => { if (btn) btn.textContent = '🔊 השמע'; };
+  speechSynthesis.speak(u);
+}
+function closeIntro() { stopSpeech(); if (introEl) { introEl.remove(); introEl = null; } }
+function showIntro(wi) {
+  closeIntro();
+  const w = WORLDS[wi], story = STORIES[wi] || w.blurb;
+  const el = document.createElement('section'); el.id = 'intro'; el.className = 'glass';
+  el.innerHTML = '<div class="it">🌍 ' + w.name + ' <small>' + w.en + '</small></div><p></p><div class="ib2"><button class="ib" id="introSay">🔊 השמע</button><button class="ib ai" id="introGo">בואו נתחיל ▶</button></div>';
+  el.querySelector('p').textContent = story;
+  document.body.appendChild(el); introEl = el;
+  const say = el.querySelector('#introSay');
+  say.onclick = () => { if (speechSynthesis.speaking) { stopSpeech(); say.textContent = '🔊 השמע'; } else speakHe(w.name + '. ' + story, say); };
+  el.querySelector('#introGo').onclick = closeIntro;
+}
+(() => { const st = document.createElement('style'); st.textContent = '#intro{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:min(560px,94vw);max-height:60vh;overflow-y:auto;padding:12px 16px;z-index:30;text-align:right;direction:rtl}#intro .it{font-size:17px;color:var(--g);margin-bottom:6px;letter-spacing:1px}#intro .it small{font-size:11px;opacity:.7}#intro p{font-size:14px;line-height:1.6;margin-bottom:10px}#intro .ib2{display:flex;gap:8px;justify-content:flex-start}@media(max-height:480px){#intro{bottom:4px;padding:8px 12px;max-height:72vh}#intro p{font-size:12px;line-height:1.45;margin-bottom:6px}#intro .it{font-size:14px;margin-bottom:3px}}'; document.head.appendChild(st); })();
 function enterWorld(wi, seed) {
   S.wi = wi; S.seed = seed; S.heat = 0; S.heatMax = 0; S.cur = null; S.near = null;
   S.missions = genMissions(wi, seed);
@@ -724,8 +759,10 @@ function enterWorld(wi, seed) {
   refreshWorld(); hud(); $('wchip').hidden = false;
   glog('[*] נכנסת לעולם: ' + W().en, 'ok'); glog('[*] ' + W().blurb);
   if (hooks.onWorldEntered) hooks.onWorldEntered(wi, seed);
+  if (!/#(walk|map|demo)/.test(location.hash)) showIntro(wi);
 }
 function openMap() {
+  closeIntro();
   closeModal(true); if (S.skinOpen) closeSkins();
   S.mapOpen = true; document.body.classList.add('inmap'); $('mapUI').hidden = false; $('mapBack').hidden = false;
   $('mapTitle').textContent = hooks.inRoom ? (hooks.isHost() ? '🌍 בחר עולם לכל החדר' : '🌍 מפת העולמות') : '🌍 בחר עולם · לחץ על כוכב כדי לטוס אליו';
