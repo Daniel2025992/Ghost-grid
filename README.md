@@ -66,7 +66,7 @@ OWNER_EMAIL=you@example.com OWNER_PASSWORD='סיסמה-ארוכה' npm start
 ## העלאה לאינטרנט (חובה כדי לשחק עם חברים)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Daniel2025992/Ghost-grid)
 
-לחץ על הכפתור, התחבר ל-Render עם GitHub, ומלא `OWNER_EMAIL` ו-`OWNER_PASSWORD`. אחרי כמה דקות תקבל כתובת (https://...onrender.com). את הכתובת הזו מכניסים ל-GitHub: Settings → Secrets and variables → Actions → Variables → משתנה בשם `GG_SERVER`, ואז מריצים שוב את הבנייה, וה-EXE וה-APK יכירו את השרת לבד.
+לחץ על הכפתור, התחבר ל-Render עם GitHub, ומלא את שני השדות `OWNER_EMAIL` ו-`OWNER_PASSWORD` (חובה). את `ANTHROPIC_API_KEY` ו-`GOOGLE_CLIENT_ID` מוסיפים אחר כך בדשבורד של Render, בלשונית Environment. אחרי כמה דקות תקבל כתובת (https://...onrender.com). את הכתובת הזו מכניסים ל-GitHub: Settings → Secrets and variables → Actions → Variables → משתנה בשם `GG_SERVER`, ואז מריצים שוב את הבנייה, וה-EXE וה-APK יכירו את השרת לבד.
 
 השרת חייב לרוץ במקום שכולם מגיעים אליו. הכי פשוט: [Render](https://render.com) → New → Blueprint → בחר את הריפו (יש `render.yaml` ו-`Dockerfile`).
 הגדר בדשבורד את המשתנים מ-`.env.example`: `OWNER_EMAIL`, `OWNER_PASSWORD`, ואופציונלי `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID`.
