@@ -9,13 +9,28 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
+let chalCur = null;
 const TYPES = {
-  code: {icon: '🔢', name: 'פיצוח קוד'},
-  caesar: {icon: '🔐', name: 'פענוח הצפנה'},
-  sequence: {icon: '🧩', name: 'רצף חומת אש'},
-  typing: {icon: '⌨', name: 'הקלדה מהירה'},
-  boss: {icon: '👑', name: 'בוס: 3 חידות ברצף'}
+  code: {icon: '🔷', name: 'ממסר לוחות'},
+  caesar: {icon: '🔤', name: 'פענוח אותיות'},
+  sequence: {icon: '🏁', name: 'ספרינט שערים'},
+  typing: {icon: '🔤', name: 'פענוח אותיות'},
+  boss: {icon: '👑', name: 'בוס: 3 אתגרים ברצף'}
 };
+const KIND = {code: 'plates', caesar: 'letters', sequence: 'gates', typing: 'letters'};
+/* group size -> difficulty tier (solo and up to 3 players: easy, 4: medium, 5-7: hard, 8-15: very hard) */
+const TIERS = [
+  {name: 'קל', drones: 1, speed: 1, time: 1, heat: 1, lvl: 0},
+  {name: 'בינוני', drones: 1.4, speed: 1.15, time: 0.92, heat: 1.15, lvl: 1},
+  {name: 'קשה', drones: 1.9, speed: 1.35, time: 0.82, heat: 1.35, lvl: 3},
+  {name: 'קשה מאוד', drones: 2.6, speed: 1.7, time: 0.7, heat: 1.7, lvl: 5}
+];
+function tier() { const n = hooks.roomSize(); return TIERS[n <= 3 ? 0 : n === 4 ? 1 : n <= 7 ? 2 : 3]; }
+function rescaleDrones() {
+  const base = W().drones, t = tier(), count = Math.min(14, Math.max(base.length, Math.round(base.length * t.drones)));
+  const list = Array.from({length: count}, (_, i) => { const b = base[i % base.length], round = Math.floor(i / base.length); return {...b, r: b.r + round * 3.5, v: b.v * t.speed * (round % 2 ? -1 : 1), phase: b.phase + round * 1.3 + i * 0.4}; });
+  world.setDrones(list);
+}
 
 const PROV = {
   anthropic: {name: 'Claude (Anthropic)', model: 'claude-haiku-5-5', url: 'https://console.anthropic.com/settings/keys', hint: 'המפתח מתחיל ב-sk-ant-'},
@@ -33,9 +48,9 @@ const S = {
   skin: 'ghost', ownedSkins: ['ghost', 'phantom'], near: null, skinOpen: false,
   wi: 0, worlds: {}, heatMax: 0, seed: 0, mapOpen: false, isAdmin: false
 };
-const hooks = {inRoom: false, isHost: () => false, sendWorld: () => {}, onNodeDone: null, onWorldEntered: null, serverAI: null};
+const hooks = {inRoom: false, isHost: () => false, sendWorld: () => {}, onNodeDone: null, onWorldEntered: null, serverAI: null, roomSize: () => 1, onRoomSize: null, tier: () => TIERS[0]};
 const W = () => WORLDS[S.wi] || WORLDS[0];
-const lv = () => S.level + W().lvBonus;
+const lv = () => S.level + W().lvBonus + tier().lvl;
 function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 /* ---------------- skins ---------------- */
@@ -119,6 +134,10 @@ const world = createWorld($('gl'), {
   onNear: id => { S.near = id; updatePrompt(); },
   onInteract: () => interact(),
   onPick: id => openMission(id),
+  onChallengeHud: i => challengeCbs.onChallengeHud(i),
+  onChallengePenalty: k => challengeCbs.onChallengePenalty(k),
+  onChallengeFx: (k, v) => challengeCbs.onChallengeFx(k, v),
+  onChallengeEnd: (a, b, c) => challengeCbs.onChallengeEnd(a, b, c),
   onPlanet: i => pickWorld(i),
   onPlanetHover: (i, x, y) => {
     const tip = $('tip');
@@ -223,7 +242,7 @@ function addXp(n) {
   while (S.xp >= xpNeed()) { S.xp -= xpNeed(); S.level++; toast('🎉 עלית לרמה ' + S.level + '! משימות קשות יותר מחכות', 'm'); sWin(); }
 }
 function addHeat(n) {
-  S.heat = clamp(S.heat + n * W().heatMul * (1 - 0.2 * S.up.stealth), 0, 100); S.heatMax = Math.max(S.heatMax, S.heat);
+  S.heat = clamp(S.heat + n * W().heatMul * tier().heat * (1 - 0.2 * S.up.stealth), 0, 100); S.heatMax = Math.max(S.heatMax, S.heat);
   hud();
   if (S.heat >= 100) lockdown();
 }
@@ -254,7 +273,7 @@ function closeModal(silent) {
 }
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
 function openMission(id) {
-  if (S.locked || !S.started) return;
+  if (S.locked || !S.started || world.challengeActive()) return;
   const m = S.missions.find(q => q.id === id); if (!m) return;
   if (m.boss && S.missions.some(q => !q.boss && !q.done)) { toast('👑 הבוס נעול: פרוץ קודם את כל שאר הצמתים', 'bad'); sBad(); return; }
   stopPuzzle(); world.setHacking(null);
@@ -262,7 +281,7 @@ function openMission(id) {
   const diff = clamp(Math.ceil((lv() + (m.reward / 100)) / 1.6), 1, 5);
   setModal(head(m) + `<p class="story">${esc(m.story)}</p>
     <div class="meta"><span>${TYPES[m.type].icon} ${TYPES[m.type].name}</span><span>💠 +${m.reward}</span><span>קושי ${stars(diff)}</span>${m.ai ? '<span style="border-color:#ff2bd6">✨ נכתב על ידי AI</span>' : ''}</div>
-    <button class="big" id="mgo">${m.done ? '✓ כבר נפרץ – אפשר לשחק שוב בלי פרס' : '▶ התחל פריצה'}</button>`);
+    <button class="big" id="mgo">${m.done ? '✓ כבר נפרץ – אפשר לשחק שוב בלי פרס' : '▶ התחל משימה בעולם'}</button>`);
   $('mgo').onclick = () => startPuzzle(m);
 }
 function result(m, ok, title, text) {
@@ -288,7 +307,8 @@ function startTimer(sec, onEnd) {
   upd(); timerIv = setInterval(upd, 100);
 }
 function stopPuzzle() {
-  stopTimer(); S.puzzleActive = false;
+  stopTimer(); S.puzzleActive = false; chalCur = null;
+  try { world.stopChallenge(); } catch (e) {} chalHud(null);
   stopFns.forEach(f => { try { f(); } catch (e) {} }); stopFns = [];
 }
 const bonusTime = () => S.up.overclock * 8;
@@ -313,14 +333,56 @@ function failMission(m, why, heat = 18) {
   if (S.locked) return;
   result(m, false, '✕ נכשלת', esc(why) + '. החום עלה.');
 }
+const INSTR = {
+  plates: 'צפה ברצף הלוחות המוארים ואז דרוך עליהם באותו סדר',
+  letters: 'עבור דרך האותיות הצפות לפי הסדר כדי לאיית את המילה. אותיות אחרות מזיקות',
+  gates: 'רוץ (Shift) דרך השערים לפי המספרים לפני שהזמן נגמר'
+};
+function chalSpec(kind, extra) {
+  return {kind, level: lv() + (extra || 0), timeMul: W().timeMul * tier().time * (1 + 0.08 * S.up.overclock)};
+}
+function runStage(m, kind, extra, stage, onWin) {
+  chalCur = {m, onWin};
+  world.startChallenge(m.id, {...chalSpec(kind, extra), stage});
+}
 function startPuzzle(m) {
   if (S.locked) return;
-  stopPuzzle(); S.puzzleActive = true; S.cur = m; ac(); drone();
-  world.setHacking(m.id); world.focusNode(m.id);
-  glog('[*] מתחיל פריצה: ' + m.target);
-  setModal(head(m) + `<div id="timer"><div class="tb"><i id="tbar"></i></div><b id="tl"></b></div><div id="pz"></div>`);
-  PUZZLES[m.type](m);
+  stopPuzzle(); closeModal(true); S.puzzleActive = true; S.cur = m; ac(); drone();
+  world.setHacking(m.id);
+  glog('[*] מתחיל משימה: ' + m.target, 'm');
+  if (m.type === 'boss') {
+    const stages = ['letters', 'plates', 'gates']; let i = 0;
+    const next = () => { runStage(m, stages[i], i * 2, (i + 1) + '/3', () => { i++; if (i >= stages.length) win(m); else { sOk(); toast('👑 שלב ' + (i + 1) + ' מתוך 3', 'm'); next(); } }); };
+    next(); toast('👑 ' + INSTR.letters, 'm'); return;
+  }
+  const kind = KIND[m.type] || 'plates';
+  runStage(m, kind, 0, null, () => win(m));
+  toast('🎯 ' + INSTR[kind], 'm');
 }
+/* challenge HUD */
+function chalHud(i) {
+  const el = $('chal'); if (!el) return;
+  document.body.classList.toggle('inchal', !!i);
+  if (!i) { el.hidden = true; return; }
+  el.hidden = false;
+  const ratio = Math.max(0, i.left / i.total), p = i.progress;
+  $('chText').textContent = i.text + (i.stage ? '  ·  שלב ' + i.stage : '');
+  $('chBar').style.width = (ratio * 100) + '%'; $('chBar').classList.toggle('low', ratio < 0.25);
+  $('chTime').textContent = Math.ceil(Math.max(0, i.left)) + 's';
+  $('chProg').textContent = p[0] + ' / ' + p[1] + (i.lives < 50 ? '   ' + '❤'.repeat(Math.max(0, i.lives)) : '');
+}
+$('chX').onclick = () => { if (!world.challengeActive()) return; stopPuzzle(); S.cur = null; toast('המשימה בוטלה'); renderList(); };
+const noteTone = i => tone(260 + (i % 8) * 60, 0.16, 'triangle', 0.08);
+const challengeCbs = {
+  onChallengeHud: chalHud,
+  onChallengePenalty: () => { addHeat(4); },
+  onChallengeFx: (k, v) => { if (k === 'note') noteTone(v || 0); else if (k === 'bad') { sBad(); shake(); } else if (k === 'go') { sOk(); toast('עכשיו אתה!', 'm'); } else sBlip(); },
+  onChallengeEnd: (ok, why, ratio) => {
+    const c = chalCur; chalHud(null); if (!c) return;
+    if (ok) { timerRatio = ratio; sWin(); c.onWin(); }
+    else failMission(c.m, why || 'נכשלת');
+  }
+};
 
 /* ----- code (mastermind) ----- */
 function puzzleCode(m) {
@@ -658,7 +720,7 @@ function mapData() {
 function enterWorld(wi, seed) {
   S.wi = wi; S.seed = seed; S.heat = 0; S.heatMax = 0; S.cur = null; S.near = null;
   S.missions = genMissions(wi, seed);
-  world.applyTheme(wi, seed);
+  world.applyTheme(wi, seed); rescaleDrones();
   refreshWorld(); hud(); $('wchip').hidden = false;
   glog('[*] נכנסת לעולם: ' + W().en, 'ok'); glog('[*] ' + W().blurb);
   if (hooks.onWorldEntered) hooks.onWorldEntered(wi, seed);
@@ -738,6 +800,7 @@ const online = initOnline({
   start: () => { S.started = true; },
 });
 
+hooks.tier = tier; hooks.onRoomSize = () => { rescaleDrones(); renderList(); };
 window.__gg = {S, world, openMission, startPuzzle, enterWorld, openMap, WORLDS, online, hooks};
 /* demo hooks for screenshots */
 const H = location.hash;

@@ -7,6 +7,7 @@ import {ShaderPass} from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import {OutputPass} from 'three/examples/jsm/postprocessing/OutputPass.js';
 import {createAvatar} from './avatar.js';
 import {WORLDS} from './worlds.js';
+import {createChallenges} from './challenges.js';
 
 const COL = {cyan: 0x00f0ff, magenta: 0xff2bd6, green: 0x39ff88, red: 0xff3355, amber: 0xffb000, violet: 0x7a5cff};
 const hdr = (hex, k = 1.6) => new THREE.Color(hex).multiplyScalar(k);
@@ -323,7 +324,7 @@ export function createWorld(canvas, cb) {
     sp.userData.tex = tex;
     return sp;
   }
-  const TYPE_NAME = {code: 'פיצוח קוד', caesar: 'פענוח הצפנה', sequence: 'רצף חומת אש', typing: 'הקלדה מהירה', boss: '👑 בוס'};
+  const TYPE_NAME = {code: 'ממסר לוחות', caesar: 'פענוח אותיות', sequence: 'ספרינט שערים', typing: 'פענוח אותיות', boss: '👑 בוס'};
   function geoFor(type) {
     if (type === 'boss') return new THREE.TorusKnotGeometry(1.5, 0.45, 120, 14);
     if (type === 'code') return new THREE.OctahedronGeometry(1.7, 0);
@@ -717,6 +718,21 @@ export function createWorld(canvas, cb) {
     });
   }
 
+  /* ---------- 3D challenges ---------- */
+  const chal = createChallenges({
+    scene, pos: P.pos, hdr, colors: () => [theme.c1, theme.c2, theme.c3],
+    onHud: i => cb.onChallengeHud && cb.onChallengeHud(i),
+    onPenalty: k => { setGlitch(0.7, 0.4); cb.onChallengePenalty && cb.onChallengePenalty(k); },
+    onFx: (k, v) => cb.onChallengeFx && cb.onChallengeFx(k, v),
+    onBurst: (x, z) => burstAt(x, 1.6, z, theme.c1, 120, true),
+    onEnd: (ok, why, ratio) => { cb.onChallengeEnd && cb.onChallengeEnd(ok, why, ratio); }
+  });
+  function startChallenge(id, spec) {
+    const n = nodes.get(id); if (!n) return false;
+    hacking = id; chal.start({...spec, cx: n.base.x, cz: n.base.z}); return true;
+  }
+  function stopChallenge() { chal.stop(); hacking = null; }
+
   /* ---------- theme ---------- */
   let theme = WORLDS[0];
   function applyTheme(idx, seed) {
@@ -904,7 +920,7 @@ export function createWorld(canvas, cb) {
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
     floorMat.uniforms.uTime.value = t; moteMat.uniforms.uTime.value = t; fin.uniforms.uTime.value = t; uTimeG.value = t;
     const mv = updatePlayer(dt, t);
-    updateDrones(dt, t); updatePeers(dt, t);
+    updateDrones(dt, t); updatePeers(dt, t); if (view === 'world') chal.update(dt, t);
     if (view === 'map') { mctrl.update(); planets.forEach(p => { p.mesh.rotation.y += dt * 0.12; p.ring.rotation.z += dt * 0.25; const tg = hoverPlanet === p.idx ? 1 : 0; p.hover += (tg - p.hover) * 0.15; p.mat.uniforms.uHover.value = p.hover; p.g.scale.setScalar(1 + p.hover * 0.07); }); if (flight) updateFlight(dt); }
     if (flash > 0 && !flight) flash = Math.max(0, flash - dt * 0.8);
     fin.uniforms.uFlash.value = flash;
@@ -989,6 +1005,7 @@ export function createWorld(canvas, cb) {
     celebrate, previewSkin,
     place: (x, z, h) => { teleportTo(x, z, h, false); },
     getPos: () => P.pos.clone(), getNear: () => near,
+    challengeState: () => chal._state(), startChallenge, stopChallenge, challengeActive: () => chal.active(), setDrones, burstAt,
     applyTheme, showMap, setMapData, flyInto, isFlying: () => !!flight, getView: () => view,
     addPeer, setPeerState, setPeerSkin, removePeer, clearPeers,
     getState: () => [P.pos.x, P.pos.y, P.pos.z, P.heading],

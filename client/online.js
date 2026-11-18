@@ -146,14 +146,14 @@ export function initOnline(ctx) {
     const r = O.room; if (!r) { roomBar.hidden = true; chat.hidden = true; return; }
     const names = [...O.peers.values()].map(p => p.name);
     roomBar.hidden = false; chat.hidden = false;
-    roomBar.innerHTML = `<span>🔑 <b class="code" id="rbCode">${esc(r.code)}</b></span><button id="rbCopy" class="lnk" style="padding:3px 9px">העתק</button><span>${r.private ? '🔒 פרטי' : '🌐 ציבורי'}</span><span>👥 ${names.length + 1}/${r.max}</span><span class="note" style="margin:0">${esc(names.join(', '))}</span><button id="rbLeave" class="lnk" style="padding:3px 9px">יציאה</button>`;
+    roomBar.innerHTML = `<span>🔑 <b class="code" id="rbCode">${esc(r.code)}</b></span><button id="rbCopy" class="lnk" style="padding:3px 9px">העתק</button><span>${r.private ? '🔒 פרטי' : '🌐 ציבורי'}</span><span>👥 ${names.length + 1}/${r.max}</span><span>🎚 קושי: <b>${esc(hooks.tier().name)}</b></span><span class="note" style="margin:0">${esc(names.join(', '))}</span><button id="rbLeave" class="lnk" style="padding:3px 9px">יציאה</button>`;
     $('rbCopy').onclick = () => { try { navigator.clipboard.writeText(r.code); } catch (e) {} toast('הקוד הועתק: ' + r.code); };
     $('rbLeave').onclick = () => leaveRoom(false);
   }
   function toggleRoomPanel() { openMulti(); }
   function leaveRoom(silent) {
     if (O.room && !silent) send({t: 'leave'});
-    O.room = null; hooks.inRoom = false; O.peers.clear(); world.clearPeers(); renderRoomBar();
+    O.room = null; hooks.inRoom = false; O.peers.clear(); world.clearPeers(); renderRoomBar(); hooks.onRoomSize && hooks.onRoomSize();
     clearInterval(O.tick); if (O.ws && silent) { try { O.ws.close(); } catch (e) {} O.ws = null; }
   }
   function worldOptions() { return WORLDS.map((w, i) => `<option value="${i}">${esc(w.name)}</option>`).join(''); }
@@ -206,7 +206,7 @@ export function initOnline(ctx) {
       case 'err': if (O.onErr) O.onErr(m.error); toast(m.error, 'bad'); break;
       case 'joined': {
         O.room = m.room; O.you = m.you; O.hostId = m.host; hooks.inRoom = true; O.peers.clear();
-        m.peers.forEach(p => addPeer(p));
+        m.peers.forEach(p => addPeer(p)); hooks.onRoomSize && hooks.onRoomSize();
         mp.hidden = true; $('welcome').hidden = true; if (!isAdminOrNot()) { }
         renderRoomBar(); addChat('', 'נכנסת לחדר ' + m.room.code, true);
         send({t: 'skin', skin: S.skin});
@@ -215,8 +215,8 @@ export function initOnline(ctx) {
         ctx.flyToWorld(m.room.world, m.room.seed);
         break;
       }
-      case 'joined-peer': addPeer(m.peer); renderRoomBar(); addChat('', m.peer.name + ' הצטרף', true); sfx(); break;
-      case 'left': { const p = O.peers.get(m.id); if (p) addChat('', p.name + ' יצא', true); O.peers.delete(m.id); world.removePeer(m.id); renderRoomBar(); break; }
+      case 'joined-peer': addPeer(m.peer); sizeChanged(); addChat('', m.peer.name + ' הצטרף', true); sfx(); break;
+      case 'left': { const p = O.peers.get(m.id); if (p) addChat('', p.name + ' יצא', true); O.peers.delete(m.id); world.removePeer(m.id); sizeChanged(); break; }
       case 'state': world.setPeerState(m.id, m.p); break;
       case 'skin': world.setPeerSkin(m.id, skinById(m.skin)); break;
       case 'chat': addChat(m.name, m.text); break;
@@ -234,6 +234,8 @@ export function initOnline(ctx) {
     O.peers.set(p.id, {name: p.name});
     world.addPeer(p.id, p.name, skinById(p.skin)); if (p.p) world.setPeerState(p.id, p.p);
   }
+  hooks.roomSize = () => O.room ? O.peers.size + 1 : 1;
+  const sizeChanged = () => { hooks.onRoomSize && hooks.onRoomSize(); renderRoomBar(); };
   hooks.isHost = () => !!O.room && O.hostId === O.you;
   hooks.sendWorld = i => send({t: 'world', world: i});
   hooks.onNodeDone = m => { if (O.room && m.idx != null && !m.ai) send({t: 'done', node: m.idx}); };
@@ -280,16 +282,16 @@ export function initOnline(ctx) {
           body.appendChild(d);
         });
       } else if (tab === 'add') {
-        body.innerHTML = `<div class="note" style="margin-top:0">הוסף מנהל לפי אימייל. אם המשתמש כבר רשום הוא יהפוך למנהל. אם לא, ייווצר חשבון עם סיסמה זמנית.</div>
+        body.innerHTML = `<div class="note" style="margin-top:0">הוסף מנהל לפי אימייל. אם המשתמש כבר רשום הוא יהפוך למנהל. אם עדיין לא, ברגע שיירשם עם האימייל הזה הוא יהפוך למנהל אוטומטית. אם תכתוב גם סיסמה, ייווצר לו חשבון מיד.</div>
           <div class="row"><input class="fld" id="addEmail" placeholder="אימייל" style="letter-spacing:0;font-size:14px;text-align:left"></div>
-          <div class="row"><input class="fld" id="addPw" placeholder="סיסמה (אופציונלי, אחרת תיווצר)" style="letter-spacing:0;font-size:14px;text-align:left"></div>
+          <div class="row"><input class="fld" id="addPw" placeholder="סיסמה (אופציונלי, ליצירת חשבון מיד)" style="letter-spacing:0;font-size:14px;text-align:left"></div>
           <button class="big" id="addGo" style="margin-top:10px">הוסף מנהל</button>`;
-        $('addGo').onclick = async () => { try { const r = await api('/api/admin/add', 'POST', {email: $('addEmail').value, password: $('addPw').value || undefined}); amsg2('✓ ' + r.user.email + ' הוא עכשיו מנהל' + (r.tempPassword ? ' · סיסמה זמנית: ' + r.tempPassword : ''), true); } catch (e) { amsg2(e.message); } };
+        $('addGo').onclick = async () => { try { const r = await api('/api/admin/add', 'POST', {email: $('addEmail').value, password: $('addPw').value || undefined}); amsg2(r.pending ? '✓ ' + r.email + ' עדיין לא רשום. ברגע שיירשם עם האימייל הזה הוא יהפוך אוטומטית למנהל.' : '✓ ' + r.user.email + ' הוא עכשיו מנהל' + (r.tempPassword ? ' · סיסמה זמנית: ' + r.tempPassword : ''), true); } catch (e) { amsg2(e.message); } };
       } else if (tab === 'settings') {
         const {settings, aiConfigured, googleConfigured} = await api('/api/admin/settings');
         const row = (k, label) => `<label class="shopi" style="cursor:pointer"><span class="tx"><b>${label}</b></span><input type="checkbox" data-k="${k}" ${settings[k] ? 'checked' : ''} style="width:22px;height:22px"></label>`;
         body.innerHTML = row('allowSignup', 'אפשר הרשמה של משתמשים חדשים') + row('allowPublicRooms', 'אפשר חדרים ציבוריים') + row('aiForAdmins', 'AI של השרת למנהלים')
-          + `<div class="shopi"><span class="tx"><b>מקסימום שחקנים בחדר</b></span><input class="fld" id="setMax" type="number" min="2" max="32" value="${settings.maxRoomPlayers}" style="width:90px;letter-spacing:0;font-size:15px"></div>
+          + `<div class="shopi"><span class="tx"><b>מקסימום שחקנים בחדר (עד 15)</b></span><input class="fld" id="setMax" type="number" min="2" max="15" value="${settings.maxRoomPlayers}" style="width:90px;letter-spacing:0;font-size:15px"></div>
           <div class="shopi"><span class="tx"><b>מודל AI בשרת</b></span><input class="fld" id="setModel" value="${esc(settings.aiModel)}" style="width:230px;letter-spacing:0;font-size:13px;text-align:left"></div>
           <div class="note">מפתח ה-AI בשרת: ${aiConfigured ? '✅ מוגדר' : '❌ לא מוגדר (הגדר ANTHROPIC_API_KEY בשרת)'} · התחברות גוגל: ${googleConfigured ? '✅' : '❌ לא מוגדר (GOOGLE_CLIENT_ID)'}</div>
           <button class="big" id="setSave" style="margin-top:10px">💾 שמור</button>`;

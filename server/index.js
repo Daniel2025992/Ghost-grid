@@ -15,7 +15,7 @@ const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(__dirname, 'public');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // ---------- tiny JSON DB ----------
-let db = { users: {}, sessions: {}, settings: { allowSignup: true, allowPublicRooms: true, maxRoomPlayers: 8, aiForAdmins: true, aiModel: 'claude-sonnet-4-5' } };
+let db = { users: {}, sessions: {}, invites: {}, settings: { allowSignup: true, allowPublicRooms: true, maxRoomPlayers: 15, aiForAdmins: true, aiModel: 'claude-sonnet-4-5' } };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) }; } catch {}
 let saveT = null;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => { const tmp = DB_FILE + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, DB_FILE); }, 150); }
@@ -105,8 +105,8 @@ app.post('/api/register', (req, res) => {
   if (pw.length < 8 || pw.length > 200) return res.status(400).json({ error: 'password must be 8+ chars' });
   if (nameTaken(name)) return res.status(409).json({ error: 'username already taken' });
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({ error: 'email already registered' });
-  const u = { id: uid(), email, name, role: 'player', created: Date.now(), ...hashPw(pw), progress: null };
-  db.users[u.id] = u; save();
+  const u = { id: uid(), email, name, role: db.invites[email] ? 'admin' : 'player', created: Date.now(), ...hashPw(pw), progress: null };
+  delete db.invites[email]; db.users[u.id] = u; save();
   res.json({ token: newSession(u.id), user: publicUser(u) });
 });
 
@@ -130,8 +130,8 @@ app.post('/api/google', async (req, res) => {
     let u = Object.values(db.users).find(x => x.email === email);
     if (!u) {
       if (!db.settings.allowSignup) return res.status(403).json({ error: 'signup disabled' });
-      u = { id: uid(), email, name: uniqueName(g.name || email.split('@')[0]), role: 'player', created: Date.now(), google: true, progress: null };
-      db.users[u.id] = u;
+      u = { id: uid(), email, name: uniqueName(g.name || email.split('@')[0]), role: db.invites[email] ? 'admin' : 'player', created: Date.now(), google: true, progress: null };
+      delete db.invites[email]; db.users[u.id] = u;
     } else u.google = true;
     if (u.banned) return res.status(403).json({ error: 'account banned' });
     save(); res.json({ token: newSession(u.id), user: publicUser(u) });
@@ -166,15 +166,15 @@ app.post('/api/admin/users/:id/role', auth, adminOnly, (req, res) => {
 app.post('/api/admin/add', auth, adminOnly, (req, res) => {
   const email = normEmail(req.body.email); if (!validEmail(email)) return res.status(400).json({ error: 'invalid email' });
   let t = Object.values(db.users).find(x => x.email === email);
-  let tempPassword = null;
-  if (!t) {
-    tempPassword = String(req.body.password || crypto.randomBytes(6).toString('base64url'));
-    if (tempPassword.length < 8) return res.status(400).json({ error: 'password must be 8+ chars' });
-    t = { id: uid(), email, name: uniqueName(email.split('@')[0]), role: 'admin', created: Date.now(), ...hashPw(tempPassword), progress: null };
-    db.users[t.id] = t;
-  } else if (t.role !== 'owner') t.role = 'admin';
-  save(); res.json({ user: publicUser(t), tempPassword });
+  if (t) { if (t.role !== 'owner') t.role = 'admin'; save(); return res.json({ user: publicUser(t) }); }
+  const pw = req.body.password ? String(req.body.password) : '';
+  if (!pw) { db.invites[email] = { by: req.user.id, at: Date.now() }; save(); return res.json({ pending: true, email }); }
+  if (pw.length < 8) return res.status(400).json({ error: 'password must be 8+ chars' });
+  t = { id: uid(), email, name: uniqueName(email.split('@')[0]), role: 'admin', created: Date.now(), ...hashPw(pw), progress: null };
+  db.users[t.id] = t; save(); res.json({ user: publicUser(t), tempPassword: pw });
 });
+app.get('/api/admin/invites', auth, adminOnly, (req, res) => res.json({ invites: Object.keys(db.invites) }));
+app.delete('/api/admin/invites/:email', auth, adminOnly, (req, res) => { delete db.invites[normEmail(req.params.email)]; save(); res.json({ ok: true }); });
 app.post('/api/admin/users/:id/ban', auth, adminOnly, (req, res) => {
   const t = db.users[req.params.id]; if (!t) return res.status(404).json({ error: 'no such user' });
   if (t.role === 'owner' || (t.role === 'admin' && req.user.role !== 'owner')) return res.status(403).json({ error: 'not allowed' });
@@ -197,7 +197,7 @@ app.get('/api/admin/settings', auth, adminOnly, (req, res) => res.json({ setting
 app.put('/api/admin/settings', auth, adminOnly, (req, res) => {
   const s = req.body.settings || {}, d = db.settings;
   for (const k of ['allowSignup', 'allowPublicRooms', 'aiForAdmins']) if (typeof s[k] === 'boolean') d[k] = s[k];
-  if (Number.isInteger(s.maxRoomPlayers)) d.maxRoomPlayers = Math.min(32, Math.max(2, s.maxRoomPlayers));
+  if (Number.isInteger(s.maxRoomPlayers)) d.maxRoomPlayers = Math.min(15, Math.max(2, s.maxRoomPlayers));
   if (typeof s.aiModel === 'string' && /^[\w.\-]{3,60}$/.test(s.aiModel)) d.aiModel = s.aiModel;
   save(); res.json({ settings: d });
 });

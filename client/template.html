@@ -190,8 +190,14 @@ select.fld{letter-spacing:0;appearance:none}
 #mapUI>*{pointer-events:auto}
 #mapTitle{position:absolute;top:18px;left:50%;transform:translateX(-50%);font-size:clamp(16px,3.4vw,26px);color:#fff;text-shadow:0 0 18px var(--c);padding:10px 22px;white-space:nowrap}
 #mapBack{position:absolute;top:18px;right:18px}
-body.inmap #top,body.inmap #missions,body.inmap #log,body.inmap #hint,body.inmap #roomBar,body.inmap #chat,body.inmap #joy,body.inmap #jbtn,body.inmap #prompt{display:none!important}
+body.inchal #missions{display:none!important}
+body.inmap #chal,body.inmap #top,body.inmap #missions,body.inmap #log,body.inmap #hint,body.inmap #roomBar,body.inmap #chat,body.inmap #joy,body.inmap #jbtn,body.inmap #prompt{display:none!important}
 @media(max-width:820px){#roomBar{top:64px}#chat{bottom:200px}}
+#chal{position:absolute;top:92px;left:50%;transform:translateX(-50%);width:min(520px,92vw);padding:10px 14px;z-index:6;text-align:center}
+#chal .ct{font-size:14px;color:#fff;margin-bottom:6px;line-height:1.4}
+#chal .cr{display:flex;align-items:center;gap:10px;font-family:Consolas,monospace;font-size:13px}
+#chal .tb{flex:1}
+#chal #chX{padding:3px 10px;font-size:12px}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:rgba(0,240,255,.4);border-radius:4px}
 
 @media(max-width:820px){
@@ -238,6 +244,7 @@ body.inmap #top,body.inmap #missions,body.inmap #log,body.inmap #hint,body.inmap
  </aside>
 
  <div id="mapUI" hidden><div id="mapTitle" class="glass"></div><button id="mapBack" class="ib">↩ חזרה</button></div>
+ <div id="chal" class="glass" hidden><div class="ct" id="chText"></div><div class="cr"><b id="chProg"></b><div class="tb"><i id="chBar"></i></div><b id="chTime"></b><button id="chX" class="lnk">✖ בטל</button></div></div>
  <div id="log"></div>
  <div id="hint">WASD / חצים: תנועה · Shift: ריצה · רווח: קפיצה · E: פריצה · גרור: סיבוב מצלמה · גלול: זום</div>
  <button id="prompt" class="glass" hidden><kbd>E</kbd><span id="promptTx"></span></button>

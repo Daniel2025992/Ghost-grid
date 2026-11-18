@@ -51,8 +51,13 @@ try {
   r = await api('/api/ai/missions', 'POST', {}, owner); t('admin AI w/o server key -> clear 501', r.s === 501);
   // admins
   r = await api(`/api/admin/users/${aliceId}/role`, 'POST', { role: 'admin' }, owner); t('promote to admin', r.j.user.role === 'admin');
-  r = await api('/api/admin/add', 'POST', { email: 'new@x.com' }, alice); t('admin adds new admin w/ temp password', r.j.user.role === 'admin' && r.j.tempPassword.length >= 8);
-  const tmpPw = r.j.tempPassword; r = await api('/api/login', 'POST', { email: 'new@x.com', password: tmpPw }); t('new admin can log in', r.s === 200);
+  r = await api('/api/admin/add', 'POST', { email: 'new@x.com', password: 'temp-pass-1' }, alice); t('admin creates admin account with password', r.j.user.role === 'admin');
+  r = await api('/api/login', 'POST', { email: 'new@x.com', password: 'temp-pass-1' }); t('new admin can log in', r.s === 200);
+  r = await api('/api/admin/add', 'POST', { email: 'later@x.com' }, alice); t('invite for unregistered email is pending', r.j.pending === true);
+  r = await api('/api/admin/invites', 'GET', null, alice); t('pending invite listed', r.j.invites.includes('later@x.com'));
+  r = await api('/api/register', 'POST', { email: 'Later@x.com', password: 'password9', name: 'Later' }); t('invited email becomes admin on register', r.j.user.role === 'admin');
+  r = await api('/api/admin/add', 'POST', { email: 'b@x.com' }, alice); t('existing player promoted', r.j.user.role === 'admin');
+  r = await api(`/api/admin/users/${bobId}/role`, 'POST', { role: 'player' }, alice); t('and demoted again', r.j.user.role === 'player');
   r = await api(`/api/admin/users/${bobId}/role`, 'POST', { role: 'owner' }, alice); t('cannot grant owner', r.s === 400);
   const ownerId = (await api('/api/admin/users', 'GET', null, owner)).j.users.find(u => u.role === 'owner').id;
   r = await api(`/api/admin/users/${ownerId}/role`, 'POST', { role: 'player' }, alice); t('admin cannot demote owner', r.s === 403);
