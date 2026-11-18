@@ -99,7 +99,7 @@ export function createChallenges(env) {
     for (let i = 0; i < decoys; i++) mk(alpha[Math.floor(Math.random() * alpha.length)], -1);
     const drift = s.level >= 6;
     cur = {kind: 'letters', total: s.time, left: s.time, lives: 4, word, objs, k: 0,
-      text() { return 'עבור דרך האותיות לפי הסדר: ' + this.word.split('').map((c, i) => i < this.k ? c : '_').join(' '); },
+      text() { return 'עבור דרך האותיות לפי הסדר: ' + this.word.split('').map((c, i) => i === this.k ? '[' + c + ']' : c).join(' ') + ' · הבאה: ' + (this.word[this.k] || ''); },
       progress() { return [this.k, this.word.length]; },
       tick(dt, t) {
         const c = this;
@@ -109,7 +109,7 @@ export function createChallenges(env) {
           let x = o.x, z = o.z; if (drift) { x += Math.sin(t * 0.8 + o.ph) * 1.6; z += Math.cos(t * 0.7 + o.ph) * 1.6; }
           o.cx = x; o.cz = z;
           o.sp.position.set(x, 1.6 + Math.sin(t * 2 + o.ph) * 0.25, z); o.base.position.set(x, 0.07, z);
-          const nextHint = o.idx === c.k ? 0.12 * Math.sin(t * 6) : 0; o.sp.scale.setScalar(2.3 + nextHint + o.flash * 0.6);
+          const isN = o.idx === c.k, nextHint = isN ? 0.45 + 0.25 * Math.sin(t * 6) : -0.5; o.sp.scale.setScalar(2.3 + nextHint + o.flash * 0.6); o.sp.material.opacity = isN ? 1 : 0.55; o.base.scale.setScalar(isN ? 1.5 + 0.2 * Math.sin(t * 6) : 0.8); o.base.material.opacity = isN ? 1 : 0.3;
           o.sp.material.color.setRGB(1 + o.flash * 1.5, 1 - o.flash * 0.7, 1 - o.flash * 0.7);
           if (o.cool <= 0 && Math.hypot(pos.x - x, pos.z - z) < 1.5 && pos.y < 2.8) {
             if (o.idx === c.k) { o.alive = false; group.remove(o.sp, o.base); disposeAll(o.sp); disposeAll(o.base); c.k++; env.onFx('note', c.k); env.onBurst(x, z); if (c.k >= c.word.length) { end(true); return; } }
