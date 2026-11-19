@@ -23,9 +23,9 @@ export function initOnline(ctx) {
   /* ---------- auth screen ---------- */
   const auth = el(`<div class="card glass" style="text-align:right">
     <h2 style="text-align:center;font-family:Consolas,monospace;letter-spacing:4px;direction:ltr"><b style="color:var(--c)">GHOST</b><i style="color:var(--m);font-style:normal">//</i><b style="color:var(--c)">GRID</b></h2>
-    <div class="step">אין צורך בחשבון או בשרת. כתוב שם ושחק</div>
+    <div class="step">כתוב את השם שלך</div>
     <input class="fld" id="aGuestName" maxlength="20" placeholder="השם שלך" style="letter-spacing:0;font-size:15px;margin-top:6px;text-align:right">
-    <button class="big" id="aGuest" style="background:linear-gradient(90deg,var(--m),var(--c))">🎮 שחק (לבד או עם חברים בקוד חדר)</button>
+    <button class="big" id="aGuest" style="background:linear-gradient(90deg,var(--m),var(--c))">🎮 שחק</button>
     <details style="margin-top:14px"><summary class="note" style="cursor:pointer">🔐 יש לי שרת וחשבון (אופציונלי)</summary>
     <div class="tabs"><button id="aTabIn" class="on">התחברות</button><button id="aTabUp">הרשמה</button></div>
     <input class="fld" id="aName" placeholder="שם משתמש (3-20 תווים)" hidden maxlength="20" style="letter-spacing:1px;font-size:15px;margin-top:8px">
@@ -63,7 +63,7 @@ export function initOnline(ctx) {
   $('aGo').onclick = async () => {
     amsg('', true); $('aGo').disabled = true;
     try {
-      if (!(await loadConfig())) throw new Error('אין שרת זמין. אפשר לשחק בלי חשבון: כתוב שם ולחץ "שחק" למעלה');
+      if (!(await loadConfig())) throw new Error('אין חיבור לשרת. אפשר ללחוץ "שחק" למעלה');
       if (mode === 'up' && $('aName').value.trim().length < 3) throw new Error('חובה לבחור שם משתמש (3 תווים לפחות)');
       const j = await api(mode === 'in' ? '/api/login' : '/api/register', 'POST', {email: $('aEmail').value, password: $('aPass').value, name: $('aName').value});
       await finishLogin(j);
@@ -107,7 +107,7 @@ export function initOnline(ctx) {
          <button class="big" id="mMulti" style="margin-bottom:8px;background:linear-gradient(90deg,var(--m),var(--c))">👥 שחק עם חברים (קוד חדר)</button>
          ${isAdmin() ? '<button class="big sec" id="mAdmin" style="margin-top:0;margin-bottom:8px">⚙ פאנל ניהול</button>' : ''}`
       : `<div class="chip" style="justify-content:center;margin:10px auto;width:max-content">👤 <b>${esc(O.guest.name)}</b> <button id="mRename" class="lnk" style="padding:3px 9px">שנה שם</button></div>
-         <button class="big" id="mMulti" style="margin-bottom:8px;background:linear-gradient(90deg,var(--m),var(--c))">👥 שחק עם חברים (קוד חדר, בלי שרת)</button>
+         <button class="big" id="mMulti" style="margin-bottom:8px;background:linear-gradient(90deg,var(--m),var(--c))">👥 שחק עם חברים (קוד חדר)</button>
          <button class="big sec" id="mLogin" style="margin:0 0 8px">🔑 יש לך שרת? התחברות / הרשמה</button>`;
     bRoom.hidden = false; bAdmin.hidden = !isAdmin();
     if ($('mLogout')) $('mLogout').onclick = logout; if ($('mMulti')) $('mMulti').onclick = openMulti; if ($('mAdmin')) $('mAdmin').onclick = openAdmin; if ($('mLogin')) $('mLogin').onclick = showAuth;
@@ -216,7 +216,7 @@ export function initOnline(ctx) {
 
   function openMultiP2P() {
     mp.innerHTML = `<div class="card glass" style="text-align:right"><h2>👥 משחק עם חברים</h2>
-      <div class="note" style="margin-top:0">בלי שרת ובלי חשבון: חדר פרטי עם קוד, והחברים מתחברים ישירות אליך. החדר פעיל כל עוד אתה (המארח) במשחק.</div>
+      <div class="note" style="margin-top:0">חדר פרטי עם קוד, והחברים מתחברים ישירות אליך. החדר פעיל כל עוד אתה (המארח) במשחק.</div>
       <div class="step">צור חדר</div>
       <input class="fld" id="mpName" placeholder="שם החדר" maxlength="30" style="letter-spacing:0;font-size:14px;text-align:right">
       <div class="row"><select class="fld" id="mpWorld" style="letter-spacing:0;font-size:14px;text-align:right">${worldOptions()}</select></div>
