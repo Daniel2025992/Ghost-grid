@@ -23,6 +23,10 @@ export function initOnline(ctx) {
   /* ---------- auth screen ---------- */
   const auth = el(`<div class="card glass" style="text-align:right">
     <h2 style="text-align:center;font-family:Consolas,monospace;letter-spacing:4px;direction:ltr"><b style="color:var(--c)">GHOST</b><i style="color:var(--m);font-style:normal">//</i><b style="color:var(--c)">GRID</b></h2>
+    <div class="step">אין צורך בחשבון או בשרת. כתוב שם ושחק</div>
+    <input class="fld" id="aGuestName" maxlength="20" placeholder="השם שלך" style="letter-spacing:0;font-size:15px;margin-top:6px;text-align:right">
+    <button class="big" id="aGuest" style="background:linear-gradient(90deg,var(--m),var(--c))">🎮 שחק (לבד או עם חברים בקוד חדר)</button>
+    <details style="margin-top:14px"><summary class="note" style="cursor:pointer">🔐 יש לי שרת וחשבון (אופציונלי)</summary>
     <div class="tabs"><button id="aTabIn" class="on">התחברות</button><button id="aTabUp">הרשמה</button></div>
     <input class="fld" id="aName" placeholder="שם משתמש (3-20 תווים)" hidden maxlength="20" style="letter-spacing:1px;font-size:15px;margin-top:8px">
     <input class="fld" id="aEmail" type="text" placeholder="אימייל" autocapitalize="off" autocomplete="username" style="letter-spacing:1px;font-size:15px;margin-top:8px;text-align:left">
@@ -30,12 +34,10 @@ export function initOnline(ctx) {
     <button class="big" id="aGo" style="margin-top:12px">התחבר</button>
     <div id="gBtn" style="margin-top:10px;display:flex;justify-content:center"></div>
     <div id="aMsg" class="note" style="min-height:18px;color:var(--r)"></div>
-    <div class="step" style="margin-top:14px">או שחק בלי חשבון ובלי שרת</div>
-    <input class="fld" id="aGuestName" maxlength="20" placeholder="השם שלך" style="letter-spacing:0;font-size:15px;margin-top:6px;text-align:right">
-    <button class="big" id="aGuest" style="background:linear-gradient(90deg,var(--m),var(--c))">🎮 שחק (לבד או עם חברים בקוד חדר)</button>
     <details style="margin-top:10px"><summary class="note" style="cursor:pointer">⚙ כתובת שרת</summary>
       <input class="fld" id="aBase" placeholder="https://your-server.example" style="letter-spacing:0;font-size:14px;margin-top:8px;text-align:left">
       <div class="note">באתר שמוגש מהשרת עצמו זה מתמלא לבד. באפליקציית APK/EXE הדבק כאן את כתובת השרת שלך.</div></details>
+    </details>
   </div>`, 'auth', 'overlay');
   auth.hidden = true; auth.style.zIndex = 50;
   let mode = 'in';
@@ -61,7 +63,7 @@ export function initOnline(ctx) {
   $('aGo').onclick = async () => {
     amsg('', true); $('aGo').disabled = true;
     try {
-      if (!(await loadConfig())) throw new Error('אין חיבור לשרת. בדוק את הכתובת ב"כתובת שרת"');
+      if (!(await loadConfig())) throw new Error('אין שרת זמין. אפשר לשחק בלי חשבון: כתוב שם ולחץ "שחק" למעלה');
       if (mode === 'up' && $('aName').value.trim().length < 3) throw new Error('חובה לבחור שם משתמש (3 תווים לפחות)');
       const j = await api(mode === 'in' ? '/api/login' : '/api/register', 'POST', {email: $('aEmail').value, password: $('aPass').value, name: $('aName').value});
       await finishLogin(j);
