@@ -18,7 +18,9 @@
 | | |
 |---|---|
 | ![אותיות](docs/challenge-letters.png) | ![לוחות](docs/challenge-plates.png) |
-| ![שערים](docs/challenge-gates.png) | ![התחברות](docs/login.png) |
+| ![שערים](docs/challenge-gates.png) | ![הודעת פתיחה](docs/world-intro.png) |
+
+![מסך כניסה](docs/login.png)
 
 ## טלפון
 המשחק מותאם גם למסך קטן, גם לאורך וגם לרוחב: סרגל עליון דק, ג'ויסטיק וכפתור קפיצה, והפאנלים קטנים יותר.
